@@ -1,0 +1,7 @@
+[{"action": "tempest.stress.actions.snapshot_create_delete.SnapshotCreateDeleteTest",
+  "threads": 4,
+  "use_admin": false,
+  "use_isolated_tenants": false,
+  "kwargs": {}
+  }
+]

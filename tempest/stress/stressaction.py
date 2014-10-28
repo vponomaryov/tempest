@@ -18,7 +18,13 @@ import sys
 
 import six
 
+from random import randint
 from tempest.openstack.common import log as logging
+from tempest import clients_share as share_clients
+
+from tempest import config_share as config
+
+CONF = config.CONF
 
 
 @six.add_metaclass(abc.ABCMeta)
@@ -91,3 +97,18 @@ class StressAction(object):
     def run(self):
         """This method is where the stress test code runs."""
         return
+
+
+class ShareStressAction(StressAction):
+    def __init__(self, manager, max_runs=None, stop_on_error=False):
+        super(ShareStressAction, self).__init__(manager, max_runs=None,
+                                                stop_on_error=False)
+        share_os = share_clients.Manager(interface="json")
+        self.shares_client = share_os.shares_client
+        self.share_stress_cfg = CONF.share_stress
+        min_size = self.share_stress_cfg.min_share_size
+        max_size = self.share_stress_cfg.max_share_size
+        self.share_size = randint(min_size, max_size)
+        self.max_runs = self.share_stress_cfg.count_shares
+        self.share_network = self.share_stress_cfg.share_network_id
+        self.protocol = self.share_stress_cfg.share_protocol

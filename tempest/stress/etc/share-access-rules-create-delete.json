@@ -1,0 +1,7 @@
+[{"action": "tempest.stress.actions.share_access_rules_create_delete.ShareAccessRulesCreateDeleteTest",
+  "threads": 4,
+  "use_admin": false,
+  "use_isolated_tenants": false,
+  "kwargs": {}
+  }
+]

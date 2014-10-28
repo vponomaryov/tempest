@@ -91,6 +91,28 @@ ShareGroup = [
                     "available."),
 ]
 
+share_stress_group = cfg.OptGroup(name="share_stress",
+                                  title="Share Stress Testing Options")
+
+ShareStressGroup = [
+    cfg.IntOpt("count_shares",
+               default=10,
+               help="Share limit for stress-testing in one thread"),
+    cfg.StrOpt("share_protocol",
+               default="NFS",
+               help="Share protocol"),
+    cfg.IntOpt("min_share_size",
+               default=1,
+               help="Minimum share size for tests"),
+    cfg.IntOpt("max_share_size",
+               default=2,
+               help="Maximum share size for tests"),
+    cfg.StrOpt("share_network_id",
+               default="",
+               help="Some backend drivers requires share network "
+                    "for share creation. Share network id, that will be "
+                    "used for shares. If not set, it won't be used.")
+]
 
 class TempestConfigPrivateManila(config.TempestConfigPrivate):
 
@@ -100,6 +122,8 @@ class TempestConfigPrivateManila(config.TempestConfigPrivate):
         config.register_opt_group(cfg.CONF, service_available_group,
                                   ServiceAvailableGroup)
         config.register_opt_group(cfg.CONF, share_group, ShareGroup)
+        config.register_opt_group(cfg.CONF, share_stress_group,
+                                  ShareStressGroup)
         self.share = cfg.CONF.share
 
 
