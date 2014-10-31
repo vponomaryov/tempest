@@ -23,6 +23,7 @@ import six
 
 from tempest import auth
 from tempest import clients
+from tempest import clients_share as share_clients
 from tempest.common import credentials
 from tempest.common import debug
 from tempest.common.utils import data_utils
@@ -1312,3 +1313,60 @@ class SwiftScenarioTest(ScenarioTest):
     def download_and_verify(self, container_name, obj_name, expected_data):
         _, obj = self.object_client.get_object(container_name, obj_name)
         self.assertEqual(obj, expected_data)
+
+
+class ManilaScenarioTest(ScenarioTest):
+
+    @classmethod
+    def resource_setup(cls):
+        super(ManilaScenarioTest, cls).resource_setup()
+        os = share_clients.AdminManager(interface="json")
+        cls.shares_client = os.shares_client
+
+    def create_share(self, snapshot=None):
+        if snapshot:
+            snapshot = snapshot['id']
+
+        resp, share = self.shares_client.create_share(
+            share_protocol=self.protocol,
+            snapshot_id=snapshot,
+            share_network_id=self.share_network['id'],
+        )
+        self.shares_client.wait_for_share_status(share["id"], "available")
+        return share
+
+    def create_snapshot(self, share):
+        r, snapshot = self.shares_client.create_snapshot(
+            share['id'])
+        self.shares_client.wait_for_snapshot_status(snapshot["id"],
+                                                    "available")
+        return snapshot
+
+    def provide_access(self, share, instance):
+        network = instance['addresses'].keys()[0]
+        instance_ip = instance['addresses'][network][0]['addr']
+        resp, rule = \
+            self.shares_client.create_access_rule(share["id"],
+                                                  access_to=instance_ip)
+
+        self.shares_client.wait_for_access_rule_status(share["id"],
+                                                       rule["id"],
+                                                       "active")
+        return rule
+
+    def deny_access(self, share, rule):
+        self.shares_client.delete_access_rule(share["id"], rule["id"])
+
+    def create_share_network(self):
+        netw = self.isolated_creds.isolated_net_resources['primary'][1]
+        subnet_id = netw[u'id']
+        net_id = netw[u'network_id']
+        data = {
+            "name": "scenario-share-net",
+            "description": "scenario-share-net",
+            "neutron_net_id": str(net_id),
+            "neutron_subnet_id": str(subnet_id),
+        }
+        resp, created = self.shares_client.create_share_network(**data)
+
+        return created
