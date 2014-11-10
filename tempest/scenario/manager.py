@@ -309,7 +309,7 @@ class ScenarioTest(tempest.test.BaseTestCase):
             username = CONF.scenario.ssh_user
         if private_key is None:
             private_key = self.keypair['private_key']
-        linux_client = remote_client.RemoteClient(ip, username,
+        linux_client = remote_client.RemoteClient(ip, username, #password="ubuntu",
                                                   pkey=private_key)
         try:
             linux_client.validate_authentication()
@@ -1316,6 +1316,7 @@ class SwiftScenarioTest(ScenarioTest):
 
 
 class ManilaScenarioTest(ScenarioTest):
+    share_network = {'id': None}
 
     @classmethod
     def resource_setup(cls):
@@ -1323,7 +1324,7 @@ class ManilaScenarioTest(ScenarioTest):
         os = share_clients.AdminManager(interface="json")
         cls.shares_client = os.shares_client
 
-    def create_share(self, snapshot=None):
+    def create_share(self, snapshot=None, volume_type_id=None):
         if snapshot:
             snapshot = snapshot['id']
 
@@ -1331,6 +1332,7 @@ class ManilaScenarioTest(ScenarioTest):
             share_protocol=self.protocol,
             snapshot_id=snapshot,
             share_network_id=self.share_network['id'],
+            volume_type_id=volume_type_id,
         )
         self.shares_client.wait_for_share_status(share["id"], "available")
         return share
@@ -1342,12 +1344,15 @@ class ManilaScenarioTest(ScenarioTest):
                                                     "available")
         return snapshot
 
-    def provide_access(self, share, instance):
-        network = instance['addresses'].keys()[0]
-        instance_ip = instance['addresses'][network][0]['addr']
+    def provide_access(self, share, ip_or_instance):
+        if isinstance(ip_or_instance, dict):
+            network = ip_or_instance['addresses'].keys()[0]
+            ip = ip_or_instance['addresses'][network][0]['addr']
+        else:
+            ip = ip_or_instance
         resp, rule = \
             self.shares_client.create_access_rule(share["id"],
-                                                  access_to=instance_ip)
+                                                  access_to=ip)
 
         self.shares_client.wait_for_access_rule_status(share["id"],
                                                        rule["id"],
@@ -1370,3 +1375,12 @@ class ManilaScenarioTest(ScenarioTest):
         resp, created = self.shares_client.create_share_network(**data)
 
         return created
+
+    def create_volume_type(self, backend_name, extra_specs):
+        vt_name = data_utils.rand_name("volume-type-%s" % str(backend_name))
+        __, vt = self.shares_client.create_volume_type(name=vt_name,
+                                                       extra_specs=extra_specs)
+        self.addCleanup(self.shares_client.delete_volume_type, vt['id'])
+        self.addCleanup(self.shares_client.wait_for_resource_deletion, 
+                        {'vt_id': vt['id']})
+        return vt
