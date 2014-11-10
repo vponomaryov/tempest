@@ -109,6 +109,6 @@ class ShareStressAction(StressAction):
         min_size = self.share_stress_cfg.min_share_size
         max_size = self.share_stress_cfg.max_share_size
         self.share_size = randint(min_size, max_size)
-        self.max_runs = self.share_stress_cfg.count_shares
+        self.max_runs = self.share_stress_cfg.count_recreations
         self.share_network = self.share_stress_cfg.share_network_id
         self.protocol = self.share_stress_cfg.share_protocol

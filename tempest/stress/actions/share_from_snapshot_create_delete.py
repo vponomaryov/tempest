@@ -19,8 +19,35 @@ import tempest.stress.stressaction as stressaction
 
 class ShareFromSnapshotCreateDeleteTest(stressaction.ShareStressAction):
 
+    def setUp(self, **kwargs):
+        manila_driver = kwargs.get('driver')
+
+        if manila_driver == 'cdot':
+            extra_specs = \
+                {u'netapp:vserverName': u'testvsm',
+                 u'netapp:clusName': u'manila',
+                 u'share_backend_name': u'NetApp_WFA',
+                 u'netapp:aggrName': u'aggr2', u'netapp:levelOfAccess': u'su'}
+        elif manila_driver == "7mod":
+            extra_specs = \
+                {u'netapp:clusName': u'172.16.64.72',
+                 u'share_backend_name': u'NetApp_WFA2',
+                 u'netapp:aggrName': u'aggr1',
+                 u'netapp:levelOfAccess': u'rw'}
+        else:
+            extra_specs = None
+
+        self.volume_type_id = None
+        if extra_specs:
+            volume_type_name = data_utils.rand_name("stress-tests-volume-type")
+            __, volume_type = \
+                self.shares_client.create_volume_type(
+                    name=volume_type_name, extra_specs=extra_specs)
+
+            self.volume_type_id = volume_type['id']
+
     def run(self):
-        share_name = data_utils.rand_name("share-name")
+        share_name = data_utils.rand_name("stress-tests-share-name")
 
         self.logger.info("creating %s" % share_name)
 
@@ -30,11 +57,12 @@ class ShareFromSnapshotCreateDeleteTest(stressaction.ShareStressAction):
             description=data_utils.rand_name("share-description"),
             size=self.share_size,
             share_network_id=self.share_network,
+            volume_type_id=self.volume_type_id
         )
         self.shares_client.wait_for_share_status(share["id"], "available")
         self.logger.info("created %s" % share["id"])
 
-        snapshot_name = data_utils.rand_name("snapshot-name")
+        snapshot_name = data_utils.rand_name("stress-tests-snapshot-name")
         self.logger.info("creating %s" % snapshot_name)
 
         # create snapshot
@@ -54,7 +82,8 @@ class ShareFromSnapshotCreateDeleteTest(stressaction.ShareStressAction):
             name="from-snapshot-" + share_name,
             snapshot_id=snapshot['id'],
             description=data_utils.rand_name("share-description"),
-            share_network_id=self.share_network, )
+            share_network_id=self.share_network,
+            volume_type_id=self.volume_type_id)
 
         self.logger.info("created %s" % "from-snapshot-" + share_name)
         self.logger.info("deleting %s" % "from-snapshot-" + share_name)

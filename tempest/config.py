@@ -868,6 +868,11 @@ ScenarioGroup = [
     cfg.StrOpt('ssh_user',
                default='cirros',
                help='ssh username for the image file'),
+    cfg.ListOpt('creds_for_manila_mount',
+                default=["root", "r00tme", "192.168.0.6"],
+                help='List with creds for '
+                     'custom VM [user, password, address]'),
+
     cfg.IntOpt(
         'large_ops_number',
         default=0,

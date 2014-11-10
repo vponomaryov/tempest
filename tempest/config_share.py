@@ -95,9 +95,10 @@ share_stress_group = cfg.OptGroup(name="share_stress",
                                   title="Share Stress Testing Options")
 
 ShareStressGroup = [
-    cfg.IntOpt("count_shares",
+    cfg.IntOpt("count_recreations",
                default=10,
-               help="Share limit for stress-testing in one thread"),
+               help="Count recreations object "
+                    "for stress-testing in one thread"),
     cfg.StrOpt("share_protocol",
                default="NFS",
                help="Share protocol"),

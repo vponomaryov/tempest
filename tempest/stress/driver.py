@@ -132,113 +132,127 @@ def stress_openstack(tests, duration, max_runs=None, stop_on_error=False):
         computes = _get_compute_nodes(controller, ssh_user, ssh_key)
         for node in computes:
             do_ssh("rm -f %s" % logfiles, node, ssh_user, ssh_key)
+
+    array_with_count_threads = []
+
     for test in tests:
-        if test.get('use_admin', False):
-            manager = admin_manager
-        else:
-            manager = clients.Manager()
-        for p_number in moves.xrange(test.get('threads', default_thread_num)):
-            if test.get('use_isolated_tenants', False):
-                username = data_utils.rand_name("stress_user")
-                tenant_name = data_utils.rand_name("stress_tenant")
-                password = "pass"
-                identity_client = admin_manager.identity_client
-                _, tenant = identity_client.create_tenant(name=tenant_name)
-                identity_client.create_user(username,
-                                            password,
-                                            tenant['id'],
-                                            "email")
-                creds = auth.get_credentials(username=username,
-                                             password=password,
-                                             tenant_name=tenant_name)
-                manager = clients.Manager(credentials=creds)
+        nums = test.get('threads', default_thread_num)
+        if isinstance(nums, int):
+            array_with_count_threads.append([nums])
 
-            test_obj = importutils.import_class(test['action'])
-            test_run = test_obj(manager, max_runs, stop_on_error)
+        if isinstance(nums, list):
+            array_with_count_threads.append(nums)
 
-            kwargs = test.get('kwargs', {})
-            test_run.setUp(**dict(kwargs.iteritems()))
-
-            LOG.debug("calling Target Object %s" %
-                      test_run.__class__.__name__)
-
-            mp_manager = multiprocessing.Manager()
-            shared_statistic = mp_manager.dict()
-            shared_statistic['runs'] = 0
-            shared_statistic['fails'] = 0
-
-            p = multiprocessing.Process(target=test_run.execute,
-                                        args=(shared_statistic,))
-
-            process = {'process': p,
-                       'p_number': p_number,
-                       'action': test_run.action,
-                       'statistic': shared_statistic}
-
-            processes.append(process)
-            p.start()
-    if stop_on_error:
-        # NOTE(mkoderer): only the parent should register the handler
-        signal.signal(signal.SIGCHLD, sigchld_handler)
-    end_time = time.time() + duration
-    had_errors = False
-    try:
-        while True:
-            if max_runs is None:
-                remaining = end_time - time.time()
-                if remaining <= 0:
-                    break
+    for count_threads in array_with_count_threads:
+        for test in tests:
+            if test.get('use_admin', False):
+                manager = admin_manager
             else:
-                remaining = log_check_interval
-                all_proc_term = True
-                for process in processes:
-                    if process['process'].is_alive():
-                        all_proc_term = False
+                manager = clients.Manager()
+
+            for p_number in moves.xrange(count_threads):
+                if test.get('use_isolated_tenants', False):
+                    username = data_utils.rand_name("stress_user")
+                    tenant_name = data_utils.rand_name("stress_tenant")
+                    password = "pass"
+                    identity_client = admin_manager.identity_client
+                    _, tenant = identity_client.create_tenant(name=tenant_name)
+                    identity_client.create_user(username,
+                                                password,
+                                                tenant['id'],
+                                                "email")
+                    creds = auth.get_credentials(username=username,
+                                                 password=password,
+                                                 tenant_name=tenant_name)
+                    manager = clients.Manager(credentials=creds)
+
+                test_obj = importutils.import_class(test['action'])
+                test_run = test_obj(manager, max_runs, stop_on_error)
+
+                kwargs = test.get('kwargs', {})
+                test_run.setUp(**dict(kwargs.iteritems()))
+
+                LOG.debug("calling Target Object %s" %
+                          test_run.__class__.__name__)
+
+                mp_manager = multiprocessing.Manager()
+                shared_statistic = mp_manager.dict()
+                shared_statistic['runs'] = 0
+                shared_statistic['fails'] = 0
+
+                p = multiprocessing.Process(target=test_run.execute,
+                                            args=(shared_statistic,))
+
+                process = {'process': p,
+                           'p_number': p_number,
+                           'action': test_run.action,
+                           'statistic': shared_statistic}
+
+                processes.append(process)
+                p.start()
+
+        if stop_on_error:
+            # NOTE(mkoderer): only the parent should register the handler
+            signal.signal(signal.SIGCHLD, sigchld_handler)
+        end_time = time.time() + duration
+        had_errors = False
+        try:
+            while True:
+                if max_runs is None:
+                    remaining = end_time - time.time()
+                    if remaining <= 0:
                         break
-                if all_proc_term:
-                    break
+                else:
+                    remaining = log_check_interval
+                    all_proc_term = True
+                    for process in processes:
+                        if process['process'].is_alive():
+                            all_proc_term = False
+                            break
+                    if all_proc_term:
+                        break
 
-            time.sleep(min(remaining, log_check_interval))
-            if stop_on_error:
-                if any([True for proc in processes
-                        if proc['statistic']['fails'] > 0]):
-                    break
+                time.sleep(min(remaining, log_check_interval))
+                if stop_on_error:
+                    if any([True for proc in processes
+                            if proc['statistic']['fails'] > 0]):
+                        break
 
-            if not logfiles:
-                continue
-            if _has_error_in_logs(logfiles, computes, ssh_user, ssh_key,
-                                  stop_on_error):
+                if not logfiles:
+                    continue
+                if _has_error_in_logs(logfiles, computes, ssh_user, ssh_key,
+                                      stop_on_error):
+                    had_errors = True
+                    break
+        except KeyboardInterrupt:
+            LOG.warning("Interrupted, going to print statistics and exit ...")
+
+        if stop_on_error:
+            signal.signal(signal.SIGCHLD, signal.SIG_DFL)
+        terminate_all_processes()
+
+        sum_fails = 0
+        sum_runs = 0
+
+        LOG.info("Statistics (per process):")
+        for process in processes:
+            if process['statistic']['fails'] > 0:
                 had_errors = True
-                break
-    except KeyboardInterrupt:
-        LOG.warning("Interrupted, going to print statistics and exit ...")
+            sum_runs += process['statistic']['runs']
+            sum_fails += process['statistic']['fails']
+            LOG.info(" Process %d (%s): Run %d actions (%d failed)" %
+                     (process['p_number'],
+                      process['action'],
+                      process['statistic']['runs'],
+                         process['statistic']['fails']))
+        LOG.info("Summary:")
+        LOG.info("Run %d actions (%d failed)" %
+                 (sum_runs, sum_fails))
 
-    if stop_on_error:
-        signal.signal(signal.SIGCHLD, signal.SIG_DFL)
-    terminate_all_processes()
-
-    sum_fails = 0
-    sum_runs = 0
-
-    LOG.info("Statistics (per process):")
-    for process in processes:
-        if process['statistic']['fails'] > 0:
-            had_errors = True
-        sum_runs += process['statistic']['runs']
-        sum_fails += process['statistic']['fails']
-        LOG.info(" Process %d (%s): Run %d actions (%d failed)" %
-                 (process['p_number'],
-                  process['action'],
-                  process['statistic']['runs'],
-                     process['statistic']['fails']))
-    LOG.info("Summary:")
-    LOG.info("Run %d actions (%d failed)" %
-             (sum_runs, sum_fails))
-
-    if not had_errors and CONF.stress.full_clean_stack:
-        LOG.info("cleaning up")
-        cleanup.cleanup()
-    if had_errors:
-        return 1
-    else:
-        return 0
+        if not had_errors and CONF.stress.full_clean_stack:
+            LOG.info("cleaning up")
+            cleanup.cleanup()
+        if had_errors:
+            return 1
+        else:
+            return 0

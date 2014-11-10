@@ -15,8 +15,11 @@
 #    limitations under the License.
 
 from tempest import clients
+from tempest import clients_share as clients_share
 from tempest.openstack.common import log as logging
+from tempest import config_share as config
 
+CONF = config.CONF
 LOG = logging.getLogger(__name__)
 
 
@@ -78,12 +81,12 @@ def cleanup():
     # We have to delete snapshots first or
     # volume deletion may block
 
-    _, snaps = admin_manager.snapshots_client.\
+    _, snaps = admin_manager.snapshots_client. \
         list_snapshots({"all_tenants": True})
     LOG.info("Cleanup::remove %s snapshots" % len(snaps))
     for v in snaps:
         try:
-            admin_manager.snapshots_client.\
+            admin_manager.snapshots_client. \
                 wait_for_snapshot_status(v['id'], 'available')
             admin_manager.snapshots_client.delete_snapshot(v['id'])
         except Exception:
@@ -99,7 +102,7 @@ def cleanup():
     LOG.info("Cleanup::remove %s volumes" % len(vols))
     for v in vols:
         try:
-            admin_manager.volumes_client.\
+            admin_manager.volumes_client. \
                 wait_for_volume_status(v['id'], 'available')
             admin_manager.volumes_client.delete_volume(v['id'])
         except Exception:
@@ -110,3 +113,67 @@ def cleanup():
             admin_manager.volumes_client.wait_for_resource_deletion(v['id'])
         except Exception:
             pass
+
+
+def share_cleanup():
+    share_admin_manager = \
+        clients_share.AdminManager()
+
+    __, snapshots = \
+        share_admin_manager.shares_client.list_snapshots_with_detail(
+            {"all_tenants": True})
+
+    share_snapshots = \
+        [snapshot for snapshot in snapshots
+         if snapshot['name'].startswith("stress-tests-")]
+
+    for snapshot in share_snapshots:
+        try:
+            share_admin_manager.shares_client.delete_snapshot(
+                snapshot['id'])
+        except Exception:
+            pass
+    for snapshot in share_snapshots:
+        try:
+            share_admin_manager.shares_client.wait_for_resource_deletion(
+                snapshot_id=snapshot['id'])
+        except Exception:
+            pass
+
+    __, shares = share_admin_manager.shares_client.list_shares(
+        params={"all_tenants": True})
+    shares = \
+        [share for share in shares
+         if share['name'].startswith("stress-tests-")]
+
+    for share in shares:
+        try:
+            share_admin_manager.shares_client.delete_share(share['id'])
+        except Exception:
+            pass
+
+    for share in shares:
+        try:
+            share_admin_manager.shares_client.wait_for_resource_deletion(
+                share_id=share['id'])
+        except Exception:
+            pass
+
+    __, shares_servers = \
+        share_admin_manager.shares_client.list_share_servers()
+    for i in shares_servers:
+        if i['share_network_id'] == CONF.share_stress.share_network_id:
+            share_admin_manager.shares_client.delete_share_server(i['id'])
+
+    __, volume_types = share_admin_manager.shares_client.list_shares(
+        params={"all_tenant": True})
+
+    for volume_type in volume_types:
+        if volume_type['name'].startswith("stress-tests-"):
+            try:
+                share_admin_manager.shares_client.delete_volume_type(
+                    volume_type['id'])
+                share_admin_manager.shares_client.wait_for_resource_deletion(
+                    vt_id=volume_type['id'])
+            except Exception:
+                pass
