@@ -103,12 +103,15 @@ class ShareStressAction(StressAction):
     def __init__(self, manager, max_runs=None, stop_on_error=False):
         super(ShareStressAction, self).__init__(manager, max_runs=None,
                                                 stop_on_error=False)
+        self.max_runs = CONF.share_stress.count_recreations
         share_os = share_clients.Manager(interface="json")
         self.shares_client = share_os.shares_client
-        self.share_stress_cfg = CONF.share_stress
-        min_size = self.share_stress_cfg.min_share_size
-        max_size = self.share_stress_cfg.max_share_size
+
+        min_size = CONF.share_stress.sizes_range[0]
+        max_size = CONF.share_stress.sizes_range[1]
         self.share_size = randint(min_size, max_size)
-        self.max_runs = self.share_stress_cfg.count_recreations
-        self.share_network = self.share_stress_cfg.share_network_id
-        self.protocol = self.share_stress_cfg.share_protocol
+        self.protocol = CONF.share.enable_protocols[0]
+
+    def setUp(self, **kwargs):
+        self.volume_type_id = kwargs.get('volume_type_id')
+        self.share_network_id = kwargs.get('shared_network_id')

@@ -18,6 +18,7 @@ from tempest import clients
 from tempest import clients_share as clients_share
 from tempest.openstack.common import log as logging
 from tempest import config_share as config
+from tempest import exceptions
 
 CONF = config.CONF
 LOG = logging.getLogger(__name__)
@@ -131,13 +132,18 @@ def share_cleanup():
         try:
             share_admin_manager.shares_client.delete_snapshot(
                 snapshot['id'])
-        except Exception:
+        except exceptions.NotFound:
             pass
+        except exceptions.Unauthorized:
+            pass
+
     for snapshot in share_snapshots:
         try:
             share_admin_manager.shares_client.wait_for_resource_deletion(
                 snapshot_id=snapshot['id'])
-        except Exception:
+        except exceptions.NotFound:
+            pass
+        except exceptions.Unauthorized:
             pass
 
     __, shares = share_admin_manager.shares_client.list_shares(
@@ -149,21 +155,32 @@ def share_cleanup():
     for share in shares:
         try:
             share_admin_manager.shares_client.delete_share(share['id'])
-        except Exception:
+        except exceptions.NotFound:
+            pass
+        except exceptions.Unauthorized:
             pass
 
     for share in shares:
         try:
             share_admin_manager.shares_client.wait_for_resource_deletion(
                 share_id=share['id'])
-        except Exception:
+        except exceptions.NotFound:
+            pass
+        except exceptions.Unauthorized:
             pass
 
     __, shares_servers = \
         share_admin_manager.shares_client.list_share_servers()
-    for i in shares_servers:
-        if i['share_network_id'] == CONF.share_stress.share_network_id:
-            share_admin_manager.shares_client.delete_share_server(i['id'])
+    for shares_server in shares_servers:
+        try:
+            if shares_server['share_network_id'] == \
+                    CONF.share_stress.share_network_id:
+                share_admin_manager.shares_client.delete_share_server(
+                    shares_server['id'])
+        except exceptions.NotFound:
+            pass
+        except exceptions.Unauthorized:
+            pass
 
     __, volume_types = share_admin_manager.shares_client.list_shares(
         params={"all_tenant": True})
@@ -175,5 +192,7 @@ def share_cleanup():
                     volume_type['id'])
                 share_admin_manager.shares_client.wait_for_resource_deletion(
                     vt_id=volume_type['id'])
-            except Exception:
+            except exceptions.NotFound:
+                pass
+            except exceptions.Unauthorized:
                 pass

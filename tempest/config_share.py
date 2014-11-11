@@ -99,21 +99,11 @@ ShareStressGroup = [
                default=10,
                help="Count recreations object "
                     "for stress-testing in one thread"),
-    cfg.StrOpt("share_protocol",
-               default="NFS",
-               help="Share protocol"),
-    cfg.IntOpt("min_share_size",
-               default=1,
-               help="Minimum share size for tests"),
-    cfg.IntOpt("max_share_size",
-               default=2,
-               help="Maximum share size for tests"),
-    cfg.StrOpt("share_network_id",
-               default="",
-               help="Some backend drivers requires share network "
-                    "for share creation. Share network id, that will be "
-                    "used for shares. If not set, it won't be used.")
+    cfg.ListOpt("sizes_range",
+                default=[1, 2],
+                help="Minimum and maximim share sizes in stress tests"),
 ]
+
 
 class TempestConfigPrivateManila(config.TempestConfigPrivate):
 
