@@ -869,10 +869,16 @@ ScenarioGroup = [
                default='cirros',
                help='ssh username for the image file'),
     cfg.ListOpt('creds_for_manila_mount',
-                default=["root", "r00tme", "192.168.0.6"],
-                help='List with creds for '
-                     'custom VM [user, password, address]'),
-
+                default=[],
+                help='List with creds for custom VMs (2) '
+                     '[user, password, address, '
+                     ' user, password, address]'),
+    cfg.StrOpt('volume_type_id',
+               default='',
+               help='For correct work some backends need set this value'),
+    cfg.StrOpt('share_network_id',
+               default='',
+               help='For correct work some backends need set this value'),
     cfg.IntOpt(
         'large_ops_number',
         default=0,

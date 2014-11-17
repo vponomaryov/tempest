@@ -309,7 +309,7 @@ class ScenarioTest(tempest.test.BaseTestCase):
             username = CONF.scenario.ssh_user
         if private_key is None:
             private_key = self.keypair['private_key']
-        linux_client = remote_client.RemoteClient(ip, username, #password="ubuntu",
+        linux_client = remote_client.RemoteClient(ip, username,
                                                   pkey=private_key)
         try:
             linux_client.validate_authentication()
@@ -1316,12 +1316,13 @@ class SwiftScenarioTest(ScenarioTest):
 
 
 class ManilaScenarioTest(ScenarioTest):
-    share_network = {'id': None}
+    share_network_id = None
+    volume_type_id = None
 
     @classmethod
     def resource_setup(cls):
         super(ManilaScenarioTest, cls).resource_setup()
-        os = share_clients.AdminManager(interface="json")
+        os = share_clients.AdminManager()
         cls.shares_client = os.shares_client
 
     def create_share(self, snapshot=None, volume_type_id=None):
@@ -1331,8 +1332,8 @@ class ManilaScenarioTest(ScenarioTest):
         resp, share = self.shares_client.create_share(
             share_protocol=self.protocol,
             snapshot_id=snapshot,
-            share_network_id=self.share_network['id'],
-            volume_type_id=volume_type_id,
+            share_network_id=self.share_network_id,
+            volume_type_id=self.volume_type_id,
         )
         self.shares_client.wait_for_share_status(share["id"], "available")
         return share
@@ -1348,6 +1349,8 @@ class ManilaScenarioTest(ScenarioTest):
         if isinstance(ip_or_instance, dict):
             network = ip_or_instance['addresses'].keys()[0]
             ip = ip_or_instance['addresses'][network][0]['addr']
+        elif isinstance(ip_or_instance, list):
+            ip = ip_or_instance[2]
         else:
             ip = ip_or_instance
         resp, rule = \
@@ -1376,11 +1379,6 @@ class ManilaScenarioTest(ScenarioTest):
 
         return created
 
-    def create_volume_type(self, backend_name, extra_specs):
-        vt_name = data_utils.rand_name("volume-type-%s" % str(backend_name))
-        __, vt = self.shares_client.create_volume_type(name=vt_name,
-                                                       extra_specs=extra_specs)
-        self.addCleanup(self.shares_client.delete_volume_type, vt['id'])
-        self.addCleanup(self.shares_client.wait_for_resource_deletion, 
-                        {'vt_id': vt['id']})
-        return vt
+    def get_volume_type(self, name_or_id):
+        # TODO
+        return
