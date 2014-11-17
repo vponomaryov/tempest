@@ -28,11 +28,12 @@ class ManilaBasicScenario(manager.ManilaScenarioTest):
             self.shares_client.wait_for_resource_deletion(share_id=share["id"])
 
         __, shares_servers = self.shares_client.list_share_servers()
-        
+
         for share_server in shares_servers:
             if share_server['share_network_name'] == self.share_network['name']:
                 self.shares_client.delete_share_server(share_server['id'])
-                self.shares_client.wait_for_resource_deletion(server_id=share_server["id"])
+                self.shares_client.wait_for_resource_deletion(
+                    server_id=share_server["id"])
 
         if self.share_network_id:
             self.shares_client.delete_share_network(self.share_network_id)
@@ -49,7 +50,7 @@ class ManilaBasicScenario(manager.ManilaScenarioTest):
         if not self.volume_type_id:
             self.share_network = self.create_share_network()
             self.share_network_id = self.share_network['id']
-            
+
 
         # NOTE(MS) for some images need use password
         # authentication instead of keypair
@@ -183,74 +184,72 @@ class ManilaBasicScenario(manager.ManilaScenarioTest):
 
     def test_manila_basic(self):
         """
-        1) create share1
-        3) provide access for VM1 
-        4) mount share (1) to VM1 
-        5) create files
-        6) create snapshot from share1 (1)
-        7) create share from snapshot (6)
-        9) try mount (7) to (8) - permission denied
-        10) add access for VM2 using share (7)
-        11) try mount share (7) to VM1  - permission denied
-        12) mount share (7) to VM2
-        13) Assert files (5) exist
-        14) create additional files in share (7)
-        15) Assert files appeared only on share (7), but not on (1)
-        16) Unmount share (7) from VM2 
-        17) Assert files (5, 14) does not exist
-        18) deny access to VM2 for share (7)
-        19) try mount share(7) to VM2 - permission denied
+        1) create share 1
+        2) provide access for VM1
+        3) mount share (1) to VM1
+        4) create files
+        5) create snapshot from share1 (1)
+        6) create share from snapshot (6)
+        7) try mount (7) to (8) - permission denied
+        8) add access for VM2 using share (7)
+        9) try mount share (7) to VM1  - permission denied
+        10) mount share (7) to VM2
+        11) Assert files (5) exist
+        12) create additional files in share (7)
+        13) Assert files appeared only on share (7), but not on (1)
+        14) Unmount share (7) from VM2
+        15) Assert files (5, 14) does not exist
+        16) deny access to VM2 for share (7)
+        17) try mount share(7) to VM2 - permission denied
         """
         # 1
         share = self.create_share()
         self.shares.append(share)
-        # 3
+        # 2
         rule_1 = self.provide_access(share, self.instance_1)
-        # 4
+        # 3
         remote_client_1 = self.get_ssh_client(self.instance_1)
         mount_path_1 = "/opt/test_1"
         self.mount_share(share, remote_client_1, mount_path_1)
-
-        # 5
+        # 4
         filename_1 = "first"
         self.create_file(remote_client_1, mount_path_1, filename_1)
-        # 6
+        # 5
         snapshot = self.create_snapshot(share)
         self.snapshots.append(snapshot)
-        # 7
+        # 6
         share_from_sp = self.create_share(snapshot)
         self.shares.append(share_from_sp)
-
-        # 9
+        # 7
         remote_client_2 = self.get_ssh_client(self.instance_2)
         mount_path_2 = "/opt/test_2"
         self.mount_share(share_from_sp, remote_client_2, mount_path_2)
-        # 10
+        # 8
         rule_2 = self.provide_access(share_from_sp, self.instance_2)
-        # 11
+        # 9
         resp = self.mount_share(share_from_sp, remote_client_1, mount_path_2)
         self.assertFalse(resp)
-        # 12
+        # 10
         self.mount_share(share_from_sp, remote_client_2, mount_path_2)
-        # 13
+        # 11
         resp = self.check_file(remote_client_2, mount_path_2, filename_1)
         self.assertTrue(resp)
-        # 14
+        # 12
         filename_2 = "second"
         self.create_file(remote_client_2, mount_path_2, filename_2)
-        # 15
+        # 13
         resp = self.check_file(remote_client_2, mount_path_2, filename_2)
         self.assertTrue(resp)
         resp = self.check_file(remote_client_1, mount_path_2, filename_2)
         self.assertFalse(resp)
-        # 16
+        # 14
         self.unmount_share(remote_client_2, mount_path_2)
-        # 17
+        # 15
         resp = self.check_file(remote_client_2, mount_path_2, filename_2)
         self.assertFalse(resp)
-        # 18
+        # 16
         self.deny_access(share_from_sp, rule_2)
         self.deny_access(share, rule_1)
-        # 19
+        # 17
         resp = self.mount_share(share_from_sp, remote_client_2, mount_path_2)
         self.assertFalse(resp)
