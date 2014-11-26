@@ -103,7 +103,6 @@ class ShareStressAction(StressAction):
     def __init__(self, manager, max_runs=None, stop_on_error=False):
         super(ShareStressAction, self).__init__(manager, max_runs=None,
                                                 stop_on_error=False)
-        self.max_runs = CONF.share_stress.count_recreations
         share_os = share_clients.AdminManager(interface="json")
         self.shares_client = share_os.shares_client
 
