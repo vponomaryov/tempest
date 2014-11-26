@@ -18,19 +18,24 @@ class ManilaBasicScenario(manager.ManilaScenarioTest):
 
     def tearDown(self):
         super(ManilaBasicScenario, self).tearDown()
+        share = self.shares[1]
+        self.shares_client.delete_share(share['id'])
+        self.shares_client.wait_for_resource_deletion(share_id=share["id"])
+
         for snapshot in self.snapshots:
             self.shares_client.delete_snapshot(snapshot["id"])
             self.shares_client.wait_for_resource_deletion(
                 snapshot_id=snapshot["id"])
 
-        for share in self.shares:
-            self.shares_client.delete_share(share['id'])
-            self.shares_client.wait_for_resource_deletion(share_id=share["id"])
+        share = self.shares[0]
+        self.shares_client.delete_share(share['id'])
+        self.shares_client.wait_for_resource_deletion(share_id=share["id"])
 
         __, shares_servers = self.shares_client.list_share_servers()
 
+        network_name = self.share_network['name']
         for share_server in shares_servers:
-            if share_server['share_network_name'] == self.share_network['name']:
+            if share_server['share_network_name'] == network_name:
                 self.shares_client.delete_share_server(share_server['id'])
                 self.shares_client.wait_for_resource_deletion(
                     server_id=share_server["id"])
@@ -50,7 +55,6 @@ class ManilaBasicScenario(manager.ManilaScenarioTest):
         if not self.volume_type_id:
             self.share_network = self.create_share_network()
             self.share_network_id = self.share_network['id']
-
 
         # NOTE(MS) for some images need use password
         # authentication instead of keypair
