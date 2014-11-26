@@ -104,11 +104,11 @@ class ShareStressAction(StressAction):
         super(ShareStressAction, self).__init__(manager, max_runs=None,
                                                 stop_on_error=False)
         self.max_runs = CONF.share_stress.count_recreations
-        share_os = share_clients.Manager(interface="json")
+        share_os = share_clients.AdminManager(interface="json")
         self.shares_client = share_os.shares_client
 
-        min_size = CONF.share_stress.sizes_range[0]
-        max_size = CONF.share_stress.sizes_range[1]
+        min_size = int(CONF.share_stress.sizes_range[0])
+        max_size = int(CONF.share_stress.sizes_range[1])
         self.share_size = randint(min_size, max_size)
         self.protocol = CONF.share.enable_protocols[0]
 
