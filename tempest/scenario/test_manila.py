@@ -33,14 +33,13 @@ class ManilaBasicScenario(manager.ManilaScenarioTest):
 
         __, shares_servers = self.shares_client.list_share_servers()
 
-        network_name = self.share_network['name']
-        for share_server in shares_servers:
-            if share_server['share_network_name'] == network_name:
-                self.shares_client.delete_share_server(share_server['id'])
-                self.shares_client.wait_for_resource_deletion(
-                    server_id=share_server["id"])
-
         if self.share_network_id:
+            network_name = self.share_network['name']
+            for share_server in shares_servers:
+                if share_server['share_network_name'] == network_name:
+                    self.shares_client.delete_share_server(share_server['id'])
+                    self.shares_client.wait_for_resource_deletion(
+                        server_id=share_server["id"])
             self.shares_client.delete_share_network(self.share_network_id)
 
     def setUp(self):
